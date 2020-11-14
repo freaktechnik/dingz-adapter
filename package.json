@@ -1,0 +1,24 @@
+{
+  "name": "dingz-adapter",
+  "version": "0.1.0",
+  "description": "Dingz adapter for the WebThings gateway",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/freaktechnik/dingz-adapter.git"
+  },
+  "author": "Martin Giger (https://humanoids.be)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/freaktechnik/dingz-adapter/issues"
+  },
+  "homepage": "https://github.com/freaktechnik/dingz-adapter#readme",
+  "dependencies": {
+    "express": "^4.17.1",
+    "node-fetch": "^2.6.1",
+    "uuid": "^8.3.1"
+  }
+}
