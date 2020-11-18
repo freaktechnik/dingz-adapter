@@ -235,9 +235,9 @@ class Dingz extends Device {
                 }));
                 this.addProperty(new Property(this, 'lightLevel', {
                     title: 'Brightness',
-                    type: 'number',
+                    type: 'integer',
                     unit: 'lux',
-                    minumum: 0,
+                    minimum: 0,
                     readOnly: true
                 }));
                 this.addProperty(new Property(this, 'temperature', {
@@ -281,7 +281,9 @@ class Dingz extends Device {
                         title: 'Target Temperature',
                         type: 'number',
                         unit: 'degree celsius',
-                        '@type': 'TargetTemperatureProperty'
+                        '@type': 'TargetTemperatureProperty',
+                        minimum: -55,
+                        maximum: 125
                     }));
                     this.addProperty(new DingzProperty(this, 'thermostatMode', {
                         title: 'Thermostat Mode',
@@ -312,7 +314,9 @@ class Dingz extends Device {
                             unit: 'watt',
                             '@type': 'InstantaneousPowerProperty',
                             readOnly: true,
-                            visible: true
+                            visible: true,
+                            minimum: 0,
+                            maximum: 300
                         }));
                     }
                     else {
@@ -330,7 +334,7 @@ class Dingz extends Device {
                     detailPromises[1] = this.apiCall('dimmer_config');
                 }
                 detailPromises.push(this.registerEventListener());
-                //TODO LED actions
+                //TODO LED actions (toggle, blink)
                 return Promise.all(detailPromises);
             })
             .then(([ blindConfig, dimmerConfig ] = []) => {
@@ -422,7 +426,9 @@ class Dingz extends Device {
             type: 'number',
             unit: 'watt',
             '@type': 'InstantaneousPowerProperty',
-            readOnly: true
+            readOnly: true,
+            minimum: 0,
+            maximum: 300
         }));
         this.addAction(`shade${index}up`, {
             title: `Shade ${index} up`
@@ -464,7 +470,7 @@ class Dingz extends Device {
         }));
         this.addProperty(new DingzProperty(this, dimmerID + 'Brightness', {
             title: `Dimmer ${index} Brightness`,
-            type: 'number',
+            type: 'integer',
             minimum: 0,
             maximum: 100,
             unit: 'percent',
@@ -477,7 +483,9 @@ class Dingz extends Device {
             unit: 'watt',
             '@type': 'InstantaneousPowerProperty',
             readOnly: true,
-            visible: true
+            visible: true,
+            minimum: 0,
+            maximum: 300
         }));
         if(visible) {
             this.addAction(dimmerID + 'toggle', {
@@ -577,8 +585,12 @@ class Dingz extends Device {
 
     async poll() {
         const state = await this.apiCall('state');
-        this.findProperty('lightLevel').setCachedValueAndNotify(state.sensors.brightness);
-        this.findProperty('temperature').setCachedValueAndNotify(state.sensors.room_temperature);
+        if(state.sensors.brightness !== null) {
+            this.findProperty('lightLevel').setCachedValueAndNotify(state.sensors.brightness);
+        }
+        if(state.sensors.hasOwnProperty('room_temperature')) {
+            this.findProperty('temperature').setCachedValueAndNotify(state.sensors.room_temperature);
+        }
         this.findProperty('led').setCachedValueAndNotify(state.led.on);
         const color = state.led.mode === 'hsv' ? hsv2rgb(state.led.hsv) : state.led.rgb;
         this.findProperty('ledColor').setCachedValueAndNotify(`#${color}`);
@@ -587,7 +599,7 @@ class Dingz extends Device {
             if((dimmer.index.absolute > 1 && this.dimmerGroup2) || (dimmer.index.absolute <= 1 && this.dimmerGroup1)) {
                 const dimmerID = `dimmer${dimmer.index.absolute + 1}`;
                 this.findProperty(dimmerID).setCachedValueAndNotify(dimmer.on);
-                this.findProperty(dimmerID + 'Brightness').setCachedValueAndNotify(dimmer.output);
+                this.findProperty(dimmerID + 'Brightness').setCachedValueAndNotify(dimmer.value);
                 this.findProperty(dimmerID + 'Power').setCachedValueAndNotify(state.sensors.power_outputs[dimmer.index.absolute].value);
             }
         }

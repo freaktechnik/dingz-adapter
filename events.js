@@ -61,7 +61,9 @@ const WebEventEndpoint = {
             const device = this.listeners.get(id);
             if(device.id !== deviceName) {
                 console.warn('Impostor device:', deviceName, 'Expected device:', device.id);
+                return;
             }
+            device.updateFromDiscovery(request.ip);
             device.handleGenericEvent(index, action);
             response.sendStatus(204);
             return;
