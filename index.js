@@ -132,11 +132,11 @@ class DingzProperty extends Property {
         }
         else if(this.name === 'targetTemperature') {
             const mode = (await this.device.getProperty('thermostatMode')) !== 'off';
-            this.apiCall(`thermostat?target_temp=${value}&enable=${mode}`, 'POST');
+            this.device.apiCall(`thermostat?target_temp=${value}&enable=${mode}`, 'POST');
         }
         else if(this.name === 'thermostatMode') {
             const targetTemperature = await this.device.getProperty('targetTemperature');
-            this.apiCall(`thermostat?target_temp=${targetTemperature}&enable=${value !== 'off'}`, 'POST');
+            this.device.apiCall(`thermostat?target_temp=${targetTemperature}&enable=${value !== 'off'}`, 'POST');
             //TODO support switching between heating and cooling?
         }
         else if(this.name.startsWith('shade')) {
@@ -167,13 +167,6 @@ class Dingz extends Device {
         this.address = deviceSpec.address;
         this.mac = deviceSpec.mac.toUpperCase();
         this.setDescription('Dingz Puck');
-        this.links = [
-            {
-                rel: 'alternate',
-                mediaType: 'text/html',
-                href: `http://${deviceSpec.address}/index.html`,
-            },
-        ];
         this['@type'] = [
             'ColorControl',
             'PushButton',
@@ -360,6 +353,16 @@ class Dingz extends Device {
             });
     }
 
+    get links() {
+        return [
+            {
+                rel: 'alternate',
+                mediaType: 'text/html',
+                href: `http://${this.address}/index.html`
+            },
+        ];
+    }
+
     // 0.12 compat
     addProperty(property) {
         this.properties.set(property.name, property);
@@ -377,6 +380,7 @@ class Dingz extends Device {
     }
 
     async apiCall(path, method = 'GET', body) {
+        //skip if no address.
         try {
             const response = await fetch(`http://${this.address}/api/v1/${path}`, {
                 method,
