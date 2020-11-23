@@ -122,21 +122,21 @@ class DingzProperty extends Property {
             const action = value ? 'on' : 'off';
             const params = new URLSearchParams();
             params.append('action', action);
-            this.device.apiCall('led/set', 'POST', params);
+            await this.device.apiCall('led/set', 'POST', params);
         }
         else if(this.name === 'ledColor') {
             const params = new URLSearchParams();
             params.append('color', value.slice(1).toUpperCase());
             params.append('mode', 'rgb');
-            this.device.apiCall('led/set', 'POST', params);
+            await this.device.apiCall('led/set', 'POST', params);
         }
         else if(this.name === 'targetTemperature') {
             const mode = (await this.device.getProperty('thermostatMode')) !== 'off';
-            this.device.apiCall(`thermostat?target_temp=${value}&enable=${mode}`, 'POST');
+            await this.device.apiCall(`thermostat?target_temp=${value}&enable=${mode}`, 'POST');
         }
         else if(this.name === 'thermostatMode') {
             const targetTemperature = await this.device.getProperty('targetTemperature');
-            this.device.apiCall(`thermostat?target_temp=${targetTemperature}&enable=${value !== 'off'}`, 'POST');
+            await this.device.apiCall(`thermostat?target_temp=${targetTemperature}&enable=${value !== 'off'}`, 'POST');
             //TODO support switching between heating and cooling?
         }
         else if(this.name.startsWith('shade')) {
@@ -152,7 +152,7 @@ class DingzProperty extends Property {
                 lamellaValue = (await this.device.getProperty(this.name + 'Lamella')) || '100';
             }
             const indexNumber = parseInt(index);
-            this.device.apiCall(`shade/${indexNumber - 1}?blind=${blindValue}&lamella=${lamellaValue}`, 'POST');
+            await this.device.apiCall(`shade/${indexNumber - 1}?blind=${blindValue}&lamella=${lamellaValue}`, 'POST');
         }
         else if(this.name.startsWith('dimmer')) {
             //TODO
@@ -363,6 +363,8 @@ class Dingz extends Device {
         ];
     }
 
+    set links(val) {}
+
     // 0.12 compat
     addProperty(property) {
         this.properties.set(property.name, property);
@@ -380,7 +382,10 @@ class Dingz extends Device {
     }
 
     async apiCall(path, method = 'GET', body) {
-        //skip if no address.
+        if(!this.address) {
+            console.warn('IP not set for', this.name);
+            return;
+        }
         try {
             const response = await fetch(`http://${this.address}/api/v1/${path}`, {
                 method,
