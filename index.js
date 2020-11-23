@@ -383,7 +383,7 @@ class Dingz extends Device {
 
     async apiCall(path, method = 'GET', body) {
         if(!this.address) {
-            console.warn('IP not set for', this.name);
+            console.warn('IP not set for', this.id);
             return;
         }
         try {
@@ -589,7 +589,9 @@ class Dingz extends Device {
 
     updateFromDiscovery(address) {
         this.connectedNotify(true);
-        this.address = address;
+        if(address && !address.includes(':')) {
+            this.address = address;
+        }
     }
 
     async poll() {
