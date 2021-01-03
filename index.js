@@ -365,9 +365,22 @@ class Dingz extends Device {
 
     set links(val) {}
 
-    // 0.12 compat
-    addProperty(property) {
-        this.properties.set(property.name, property);
+    asDict() {
+        const dict = super.asDict();
+
+        for(const [key, property] of Object.entries(dict.properties)) {
+            if(property.visible === false) {
+                delete dict.properties[key];
+            }
+        }
+
+        for(const [key, action] of Object.entries(dict.actions)) {
+            if(action.visible === false) {
+                delete dict.actions[key];
+            }
+        }
+
+        return dict;
     }
 
     async performAction(action) {
