@@ -29,6 +29,7 @@
     "manifest.json",
     "SHA256SUMS",
     "LICENSE",
-    "README.md"
+    "README.md",
+    "events.js"
   ]
 }
