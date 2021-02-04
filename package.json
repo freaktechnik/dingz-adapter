@@ -4,8 +4,7 @@
   "description": "Dingz adapter for the WebThings gateway",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "licenses": "./gather-licenses.js"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
     "type": "git",
