@@ -559,11 +559,9 @@ class Dingz extends Device {
             title: `Key ${index} double press`
         });
         this.addEvent(keyID + 'tripple', {
-            '@type': 'DoublePressedEvent',
             title: `Key ${index} tripple press`
         });
         this.addEvent(keyID + 'quadruple', {
-            '@type': 'DoublePressedEvent',
             title: `Key ${index} quadruple press`
         });
         this.addEvent(keyID + 'long', {
