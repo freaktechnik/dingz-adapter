@@ -412,7 +412,7 @@ class Dingz extends Device {
             }
             else {
                 const error = await response.text();
-                throw new Error(error);
+                throw new Error(`${response.status}: ${error}`);
             }
         }
         catch(error) {
@@ -558,6 +558,14 @@ class Dingz extends Device {
             '@type': 'DoublePressedEvent',
             title: `Key ${index} double press`
         });
+        this.addEvent(keyID + 'tripple', {
+            '@type': 'DoublePressedEvent',
+            title: `Key ${index} tripple press`
+        });
+        this.addEvent(keyID + 'quadruple', {
+            '@type': 'DoublePressedEvent',
+            title: `Key ${index} quadruple press`
+        });
         this.addEvent(keyID + 'long', {
             '@type': 'LongPressedEvent',
             title: `Key ${index} long press`
@@ -567,8 +575,16 @@ class Dingz extends Device {
     async registerEventListener() {
         const callbackUrl = await WebEventEndpoint.addDevice(this);
         console.log(callbackUrl);
-        await this.apiCall('action/generic', 'POST', callbackUrl);
-        await this.apiCall('action/generic/press_release/enable', 'POST');
+        await this.apiCall('action/generic/generic', 'POST', callbackUrl);
+        // calls that don't fully support being generic yet
+        await this.apiCall('action/btn1/begin', 'POST', callbackUrl + `?index=1&action=begin&mac=${this.mac}`);
+        await this.apiCall('action/btn1/end', 'POST', callbackUrl + `?index=1&action=end&mac=${this.mac}`);
+        await this.apiCall('action/btn2/begin', 'POST', callbackUrl + `?index=2&action=begin&mac=${this.mac}`);
+        await this.apiCall('action/btn2/end', 'POST', callbackUrl + `?index=2&action=end&mac=${this.mac}`);
+        await this.apiCall('action/btn3/begin', 'POST', callbackUrl + `?index=3&action=begin&mac=${this.mac}`);
+        await this.apiCall('action/btn3/end', 'POST', callbackUrl + `?index=3&action=end&mac=${this.mac}`);
+        await this.apiCall('action/btn4/begin', 'POST', callbackUrl + `?index=4&action=begin&mac=${this.mac}`);
+        await this.apiCall('action/btn4/end', 'POST', callbackUrl + `?index=4&action=end&mac=${this.mac}`);
     }
 
     handleGenericEvent(index, action) {
@@ -577,13 +593,23 @@ class Dingz extends Device {
             const keyID = `key${index}`;
             if(action === '1') {
                 this.eventNotify(new Event(this, keyID + 'single'));
-            } else if(action === '2') {
+            }
+            else if(action === '2') {
                 this.eventNotify(new Event(this, keyID + 'double'))
-            } else if(action === '3') {
+            }
+            else if(action === '3') {
                 this.eventNotify(new Event(this, keyID + 'long'))
-            } else if(action === '8') {
+            }
+            else if(action === '20') {
+                this.eventNotify(new Event(this, keyID + 'tripple'));
+            }
+            else if(action === '21') {
+                this.eventNotify(new Event(this, keyID + 'quadruple'));
+            }
+            else if(action === '8' || action === 'begin') {
                 this.findProperty(keyID).setCachedValueAndNotify(true);
-            } else if(action === '9') {
+            }
+            else if(action === '9' || action === 'end') {
                 this.findProperty(keyID).setCachedValueAndNotify(false);
             }
         }
