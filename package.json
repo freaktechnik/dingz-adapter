@@ -1,6 +1,6 @@
 {
   "name": "dingz-adapter",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "Dingz adapter for the WebThings gateway",
   "main": "index.js",
   "scripts": {
