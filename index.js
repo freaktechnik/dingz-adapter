@@ -146,7 +146,7 @@ class DingzProperty extends Property {
             if(this.name.endsWith('Lamella')) {
                 index = index.slice(0, -7);
                 lamellaValue = value;
-                blindValue = await this.device.getProperty(this.name.slice(0, -7));
+                blindValue = (await this.device.getProperty(this.name.slice(0, -7))) || '100';
             }
             else {
                 lamellaValue = (await this.device.getProperty(this.name + 'Lamella')) || '100';
@@ -166,6 +166,7 @@ class Dingz extends Device {
         super(adapter, `dingz-${deviceSpec.mac.toLowerCase()}`);
         this.address = deviceSpec.address;
         this.mac = deviceSpec.mac.toUpperCase();
+        this.connected = true;
         this.setDescription('Dingz Puck');
         this['@type'] = [
             'ColorControl',
@@ -416,7 +417,7 @@ class Dingz extends Device {
             }
         }
         catch(error) {
-            if(error.type === 'system' && error.code === 'ETIMEDOUT') {
+            if(error.type === 'system' && (error.code === 'ETIMEDOUT' || error.code === 'EHOSTUNREACH')) {
                 this.connectedNotify(false);
             }
             else {
@@ -631,7 +632,15 @@ class Dingz extends Device {
         }
     }
 
+    connectedNotify(state) {
+        super.connectedNotify(state);
+        this.connected = state;
+    }
+
     async poll() {
+        if(!this.connected) {
+            return;
+        }
         const state = await this.apiCall('state');
         if(state.sensors.brightness !== null) {
             this.findProperty('lightLevel').setCachedValueAndNotify(state.sensors.brightness);
