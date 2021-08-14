@@ -146,10 +146,20 @@ class DingzProperty extends Property {
             if(this.name.endsWith('Lamella')) {
                 index = index.slice(0, -7);
                 lamellaValue = value;
-                blindValue = (await this.device.getProperty(this.name.slice(0, -7))) || '100';
+                try {
+                    blindValue = await this.device.getProperty(this.name.slice(0, -7));
+                }
+                catch(error) {
+                    blindValue = 100;
+                }
             }
             else {
-                lamellaValue = (await this.device.getProperty(this.name + 'Lamella')) || '100';
+                try {
+                    lamellaValue = await this.device.getProperty(this.name + 'Lamella');
+                }
+                catch(error) {
+                    lamellaValue = 100;
+                }
             }
             const indexNumber = parseInt(index);
             await this.device.apiCall(`shade/${indexNumber - 1}?blind=${blindValue}&lamella=${lamellaValue}`, 'POST');
