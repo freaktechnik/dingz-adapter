@@ -116,12 +116,20 @@ const DevicePoller = {
     }
 };
 
-class DingzProperty extends Property {
+class BasicDingzProperty extends Property {
     constructor(...args) {
         super(...args);
         this.visible = true;
     }
 
+    asDict() {
+        const dict = super.asDict();
+        dict.visible = this.visible;
+        return dict;
+    }
+}
+
+class DingzProperty extends BasicDingzProperty {
     async setValue(value) {
         if(this.name === 'led') {
             const action = value ? 'on' : 'off';
@@ -173,12 +181,6 @@ class DingzProperty extends Property {
             //TODO
         }
         return super.setValue(value);
-    }
-
-    asDict() {
-        const dict = super.asDict();
-        dict.visible = this.visible;
-        return dict;
     }
 }
 
@@ -248,14 +250,14 @@ class Dingz extends Device {
                     type: 'string',
                     '@type': 'ColorProperty'
                 }));
-                this.addProperty(new Property(this, 'lightLevel', {
+                this.addProperty(new BasicDingzProperty(this, 'lightLevel', {
                     title: 'Brightness',
                     type: 'integer',
                     unit: 'lux',
                     minimum: 0,
                     readOnly: true
                 }));
-                this.addProperty(new Property(this, 'temperature', {
+                this.addProperty(new BasicDingzProperty(this, 'temperature', {
                     title: 'Temperature',
                     type: 'number',
                     unit: 'degree celsius',
@@ -284,7 +286,7 @@ class Dingz extends Device {
                     this.addShade(2);
                 }
                 if(this.motionSensor) {
-                    this.addProperty(new Property(this, 'motion', {
+                    this.addProperty(new BasicDingzProperty(this, 'motion', {
                         title: 'Motion',
                         type: 'boolean',
                         readOnly: true,
@@ -310,7 +312,7 @@ class Dingz extends Device {
                         ],
                         '@type': 'ThermostatModeProperty'
                     }));
-                    this.addProperty(new Property(this, 'thermostatState', {
+                    this.addProperty(new BasicDingzProperty(this, 'thermostatState', {
                         title: 'Thermostat State',
                         type: 'string',
                         enum: [
@@ -323,7 +325,7 @@ class Dingz extends Device {
                     }));
                     const dimmerID = `dimmer${this.thermostatOutput + 1}`;
                     if(!this.hasProperty(dimmerID + 'Power')) {
-                        this.addProperty(new Property(this, dimmerID + 'Power', {
+                        this.addProperty(new BasicDingzProperty(this, dimmerID + 'Power', {
                             title: 'Thermostat Valve Power',
                             type: 'number',
                             unit: 'watt',
@@ -465,7 +467,7 @@ class Dingz extends Device {
             '@type': 'LevelProperty',
             unit: 'percent'
         }));
-        this.addProperty(new Property(this, `shade${index}Power`, {
+        this.addProperty(new BasicDingzProperty(this, `shade${index}Power`, {
             title: `Shade ${index} Power`,
             type: 'number',
             unit: 'watt',
@@ -521,7 +523,7 @@ class Dingz extends Device {
             '@type': 'BrightnessProperty',
             visible
         }));
-        this.addProperty(new Property(this, dimmerID + 'Power', {
+        this.addProperty(new BasicDingzProperty(this, dimmerID + 'Power', {
             title: `Dimmer ${index} Power`,
             type: 'number',
             unit: 'watt',
@@ -566,7 +568,7 @@ class Dingz extends Device {
 
     addKey(index) {
         const keyID = `key${index}`;
-        this.properties.set(keyID, new Property(this, keyID, {
+        this.properties.set(keyID, new BasicDingzProperty(this, keyID, {
             title: `Key ${index}`,
             type: 'boolean',
             readOnly: true,
