@@ -117,9 +117,9 @@ const DevicePoller = {
 };
 
 class BasicDingzProperty extends Property {
-    constructor(...args) {
-        super(...args);
-        this.visible = true;
+    constructor(device, name, spec, ...args) {
+        super(device, name, spec, ...args);
+        this.visible = spec.visible ?? true;
     }
 
     asDict() {
