@@ -117,6 +117,11 @@ const DevicePoller = {
 };
 
 class DingzProperty extends Property {
+    constructor(...args) {
+        super(...args);
+        this.visible = true;
+    }
+
     async setValue(value) {
         if(this.name === 'led') {
             const action = value ? 'on' : 'off';
@@ -168,6 +173,12 @@ class DingzProperty extends Property {
             //TODO
         }
         return super.setValue(value);
+    }
+
+    asDict() {
+        const dict = super.asDict();
+        dict.visible = this.visible;
+        return dict;
     }
 }
 
