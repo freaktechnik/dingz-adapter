@@ -497,7 +497,7 @@ class Dingz extends Device {
     setShadeConfig(index, config) {
         const shadeConfig = config.blinds[index - 1];
         const lamellaProperty = this.findProperty(`shade${index}Lamella`);
-        lamellaProperty.visible = shadeConfig.type === 'lamella_90';
+        lamellaProperty.visible = shadeConfig.type === 'blind';
         const levelProperty = this.findProperty(`shade${index}`);
         levelProperty.minimum = shadeConfig.min_value;
         levelProperty.maximum = shadeConfig.max_value;
