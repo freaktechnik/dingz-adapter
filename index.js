@@ -2,7 +2,7 @@
 
 const { Adapter, Device, Property, Event, Database } = require('gateway-addon');
 const manifest = require('./manifest.json');
-const Client = require('node-ssdp');
+const { Client } = require('node-ssdp');
 const fetch = require('node-fetch');
 const { URLSearchParams } = require('url');
 const WebEventEndpoint = require('./events');
