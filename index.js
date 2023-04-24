@@ -218,7 +218,7 @@ class Dingz extends Device {
             this.apiCall('outputs')
                 .then((outputs) => {
                     const thermostatOutput = outputs.find((output) => output.type === "heating_valve");
-                    if (thermostatOutput?.enable) {
+                    if (thermostatOutput && thermostatOutput.enable) {
                         this.thermostatOutput = thermostatOutput.ph_out_id;
                     }
                 })
