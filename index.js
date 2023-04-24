@@ -2,15 +2,11 @@
 
 const { Adapter, Device, Property, Event, Database } = require('gateway-addon');
 const manifest = require('./manifest.json');
-const dgram = require('dgram');
+const Client = require('node-ssdp');
 const fetch = require('node-fetch');
 const { URLSearchParams } = require('url');
 const WebEventEndpoint = require('./events');
 
-const DINGZ_DISCOVERY_PORT = 7979;
-const DISCOVERY_MESSAGE_BYTES = 8;
-const DINGZ_TYPE = 108;
-const MAC_BYTES = [ 0, 1, 2, 3, 4, 5 ];
 const DEFAULT_POLL_INTERVAL_S = 3;
 const THERMOSTAT_STATE_TO_MODE = {
     heating: 'heat',
@@ -55,25 +51,24 @@ function hsv2rgb(hsv) {
 class DingzDiscovery {
     constructor(discoveryCallback) {
         this.discoveryCallback = discoveryCallback;
-        this.server = dgram.createSocket({ type: 'udp4', reuseAddr: true });
-        this.server.bind(DINGZ_DISCOVERY_PORT);
-        this.server.on('message', (msg, remoteInfo) => {
-            if(remoteInfo.size === DISCOVERY_MESSAGE_BYTES) {
-                const type = msg.readUInt8(6);
-                if (type === DINGZ_TYPE) {
-                    const mac = MAC_BYTES.map((byteIndex) => msg.readUInt8(byteIndex).toString(16)).join('');
-                    if(this.discoveryCallback) {
+        this.server = new Client()
+        this.server.on('response', (headers, statusCode, remoteInfo) => {
+            console.log(headers, statusCode, remoteInfo);
+            if(this.discoveryCallback) {
+                fetch(`http://${remoteInfo.address}/api/v1/info`)
+                    .then((response) => response.json())
+                    .then((info) => {
                         this.discoveryCallback({
-                            mac,
+                            mac: info.mac,
                             address: remoteInfo.address,
                         });
-                    }
-                }
+                    });
             }
         });
+        this.server.search('urn:schemas-iolo-ch:device:DINGZ:1.0');
     }
     destroy() {
-        this.server.close();
+        this.server.stop();
     }
 }
 

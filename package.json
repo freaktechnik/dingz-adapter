@@ -19,6 +19,7 @@
   "dependencies": {
     "express": "^4.18.2",
     "node-fetch": "^2.6.9",
+    "node-ssdp": "^4.0.1",
     "uuid": "^9.0.0"
   },
   "devDependencies": {
