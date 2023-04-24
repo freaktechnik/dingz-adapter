@@ -53,7 +53,6 @@ class DingzDiscovery {
         this.discoveryCallback = discoveryCallback;
         this.server = new Client()
         this.server.on('response', (headers, statusCode, remoteInfo) => {
-            console.log(headers, statusCode, remoteInfo);
             if(this.discoveryCallback) {
                 fetch(`http://${remoteInfo.address}/api/v1/info`)
                     .then((response) => response.json())
@@ -545,7 +544,7 @@ class Dingz extends Device {
     setDimmerConfig(index, dimmerConfig) {
         if(index - 1 !== this.thermostatOutput) {
             const config = dimmerConfig.dimmers[index - 1];
-            const visible = config.output !== 'not_connected';
+            const visible = config.active && config.type == "light";
             const dimmerID = `dimmer${index}`;
             const dimmerProperty = this.findProperty(dimmerID);
             const dimmerBrightnessProperty = this.findProperty(dimmerID + 'Brightness');
@@ -598,7 +597,7 @@ class Dingz extends Device {
     async registerEventListener() {
         const callbackUrl = await WebEventEndpoint.addDevice(this);
         console.log(callbackUrl);
-        await this.apiCall('action/generic/generic', 'POST', callbackUrl);
+        await this.apiCall('action/generic', 'POST', callbackUrl);
         // calls that don't fully support being generic yet
         await this.apiCall('action/btn1/begin', 'POST', callbackUrl + `?index=1&action=begin&mac=${this.mac}`);
         await this.apiCall('action/btn1/end', 'POST', callbackUrl + `?index=1&action=end&mac=${this.mac}`);
@@ -706,8 +705,7 @@ class Dingz extends Device {
             this.findProperty('thermostatMode').setCachedValueAndNotify(thermostatMode);
             const thermostatState = state.thermostat.on ? state.thermostat.mode : 'off';
             this.findProperty('thermostatState').setCachedValueAndNotify(thermostatState);
-            this.findProperty(`dimmer${state.thermostat.out + 1}Power`).setCachedValueAndNotify(state.sensors.power_outputs[state.thermostat.out].value);
-
+            this.findProperty(`dimmer${this.thermostatOutput + 1}Power`).setCachedValueAndNotify(state.sensors.power_outputs[this.thermostatOutput].value);
         }
     }
 }
