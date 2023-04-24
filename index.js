@@ -144,12 +144,12 @@ class DingzProperty extends BasicDingzProperty {
             await this.device.apiCall('led/set', 'POST', params);
         }
         else if(this.name === 'targetTemperature') {
-            const mode = (await this.device.getProperty('thermostatMode')) !== 'off';
-            await this.device.apiCall(`thermostat?target_temp=${value}&enable=${mode}`, 'POST');
+            const mode = await this.device.getProperty('thermostatMode');
+            await this.device.apiCall(`thermostat/${mode}?temp=${value}`, 'POST');
         }
         else if(this.name === 'thermostatMode') {
             const targetTemperature = await this.device.getProperty('targetTemperature');
-            await this.device.apiCall(`thermostat?target_temp=${targetTemperature}&enable=${value !== 'off'}`, 'POST');
+            await this.device.apiCall(`thermostat/${value ? 'on' : 'off'}?temp=${targetTemperature}`, 'POST');
             //TODO support switching between heating and cooling?
         }
         else if(this.name.startsWith('shade')) {
@@ -175,7 +175,7 @@ class DingzProperty extends BasicDingzProperty {
                 }
             }
             const indexNumber = parseInt(index);
-            await this.device.apiCall(`shade/${indexNumber - 1}?blind=${blindValue}&lamella=${lamellaValue}`, 'POST');
+            await this.device.apiCall(`shade/${indexNumber - 1}`, 'POST', `blind=${blindValue}&lamella=${lamellaValue}`);
         }
         else if(this.name.startsWith('dimmer')) {
             //TODO
@@ -214,7 +214,13 @@ class Dingz extends Device {
             this.apiCall('thermostat')
                 .then((thermostatState) => {
                     this.thermostat = thermostatState.active;
-                    this.thermostatOutput = thermostatState.out;
+                }),
+            this.apiCall('outputs')
+                .then((outputs) => {
+                    const thermostatOutput = outputs.find((output) => output.type === "heating_valve");
+                    if (thermostatOutput?.enable) {
+                        this.thermostatOutput = thermostatOutput.ph_out_id;
+                    }
                 })
         ])
             .then(() => {
