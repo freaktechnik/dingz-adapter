@@ -132,9 +132,13 @@ class DingzProperty extends BasicDingzProperty {
             await this.device.apiCall('led/set', 'POST', params);
         }
         else if(this.name === 'ledColor') {
+            if (!value) {
+                return;
+            }
             const params = new URLSearchParams();
             params.append('color', value.slice(1).toUpperCase());
             params.append('mode', 'rgb');
+            params.append('action', this.findProperty('led') ? 'on' : 'off');
             await this.device.apiCall('led/set', 'POST', params);
         }
         else if(this.name === 'targetTemperature') {
