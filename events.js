@@ -59,6 +59,7 @@ const WebEventEndpoint = {
         if(this.listeners.has(id) && request.body.index) {
             const { index, action, mac } = request.body;
             const deviceName = `dingz-${mac.toLowerCase()}`;
+            console.log(deviceName, index, action, id);
             const device = this.listeners.get(id);
             if(device.id !== deviceName) {
                 console.warn('Impostor device:', deviceName, 'Expected device:', device.id);
