@@ -138,7 +138,7 @@ class DingzProperty extends BasicDingzProperty {
             const params = new URLSearchParams();
             params.append('color', value.slice(1).toUpperCase());
             params.append('mode', 'rgb');
-            params.append('action', this.findProperty('led') ? 'on' : 'off');
+            params.append('action', this.device.findProperty('led') ? 'on' : 'off');
             await this.device.apiCall('led/set', 'POST', params);
         }
         else if(this.name === 'targetTemperature') {
