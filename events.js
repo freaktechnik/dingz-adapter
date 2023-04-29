@@ -56,6 +56,7 @@ const WebEventEndpoint = {
     handleEvent(request, response) {
         const { device: id } = request.params;
         // Make sure we know the device and that the request has all the context to identify the event
+        console.log(request.body);
         if(this.listeners.has(id) && request.body.index) {
             const { index, action, mac } = request.body;
             const deviceName = `dingz-${mac.toLowerCase()}`;
