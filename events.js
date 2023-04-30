@@ -59,7 +59,7 @@ const WebEventEndpoint = {
         console.log(request.body);
         if(this.listeners.has(id) && request.body.index) {
             const { index, action, mac } = request.body;
-            const deviceName = `dingz-${mac.toLowerCase()}`;
+            const deviceName = Array.isArray(mac) ? `dingz-${mac[0].toLowerCase()}` : `dingz-${mac.toLowerCase()}`;
             console.log(deviceName, index, action, id);
             const device = this.listeners.get(id);
             if(device.id !== deviceName) {
