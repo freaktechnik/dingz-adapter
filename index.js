@@ -602,6 +602,17 @@ class Dingz extends Device {
         const callbackUrl = await WebEventEndpoint.addDevice(this);
         console.log(callbackUrl, this.mac);
         await this.apiCall('action/generic', 'POST', `url=${callbackUrl}?mac=${this.mac}`);
+        // calls that don't fully support being generic yet
+        const body = new URLSearchParams();
+        body.append('url', `${callbackUrl}?index=1&action=begin&mac=${this.mac}`);
+        await this.apiCall('action/btn1/begin', 'POST', body.toString());
+        await this.apiCall('action/btn1/end', 'POST', callbackUrl + `?index=1&action=end&mac=${this.mac}`);
+        await this.apiCall('action/btn2/begin', 'POST', callbackUrl + `?index=2&action=begin&mac=${this.mac}`);
+        await this.apiCall('action/btn2/end', 'POST', callbackUrl + `?index=2&action=end&mac=${this.mac}`);
+        await this.apiCall('action/btn3/begin', 'POST', callbackUrl + `?index=3&action=begin&mac=${this.mac}`);
+        await this.apiCall('action/btn3/end', 'POST', callbackUrl + `?index=3&action=end&mac=${this.mac}`);
+        await this.apiCall('action/btn4/begin', 'POST', callbackUrl + `?index=4&action=begin&mac=${this.mac}`);
+        await this.apiCall('action/btn4/end', 'POST', callbackUrl + `?index=4&action=end&mac=${this.mac}`);
     }
 
     handleGenericEvent(index, action) {
