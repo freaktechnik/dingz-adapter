@@ -601,7 +601,7 @@ class Dingz extends Device {
     async registerEventListener() {
         const callbackUrl = await WebEventEndpoint.addDevice(this);
         console.log(callbackUrl, this.mac);
-        await this.apiCall('action/generic', 'POST', `${callbackUrl}?mac=${this.mac}`);
+        await this.apiCall('action/generic', 'POST', callbackUrl);
         await this.apiCall('action/btn1/begin', 'POST', `${callbackUrl}?index=1&action=begin&mac=${this.mac}`);
         await this.apiCall('action/btn1/end', 'POST', callbackUrl + `?index=1&action=end&mac=${this.mac}`);
         await this.apiCall('action/btn2/begin', 'POST', callbackUrl + `?index=2&action=begin&mac=${this.mac}`);
