@@ -498,10 +498,10 @@ class Dingz extends Device {
             case "sensor":
                 switch(details[0]) {
                     case "temperature":
-                        this.findProperty("temperature")?.setCachedValueAndNotify(message);
+                        this.findProperty("temperature").setCachedValueAndNotify(message);
                         break;
                     case "light":
-                        this.findProperty("lightLevel")?.setCachedValueAndNotify(message);
+                        this.findProperty("lightLevel").setCachedValueAndNotify(message);
                         break;
                 }
                 break;
@@ -509,10 +509,10 @@ class Dingz extends Device {
                 const index = parseInt(details[1], 10) + 1;
                 switch(details[0]) {
                     case "motor":
-                        this.findProperty(`shade${index}Power`)?.setCachedValueAndNotify(message);
+                        this.findProperty(`shade${index}Power`).setCachedValueAndNotify(message);
                         break;
                     case "light":
-                        this.findProperty(`dimmer${index}Power`)?.setCachedValueAndNotify(message);
+                        this.findProperty(`dimmer${index}Power`).setCachedValueAndNotify(message);
                         break;
                 }
                 break;
@@ -528,24 +528,24 @@ class Dingz extends Device {
                 switch(details[0]) {
                     case "light": {
                         const index = parseInt(details[1], 10) + 1;
-                        this.findProperty(`dimmer${index}`)?.setCachedValueAndNotify(message.turn === "off");
-                        this.findProperty(`dimmer${index}Brightness`)?.setCachedValueAndNotify(message.brightness);
+                        this.findProperty(`dimmer${index}`).setCachedValueAndNotify(message.turn === "off");
+                        this.findProperty(`dimmer${index}Brightness`).setCachedValueAndNotify(message.brightness);
                         break;
                     }
                     case "thermostat":
-                        this.findProperty('thermostatMode')?.setCachedValueAndNotify(message.status);
-                        this.findProperty('thermostatState')?.setCachedValueAndNotify(message.status === 'on' ? message.mode : 'off');
-                        this.findProperty('targetTemperature')?.setCachedValueAndNotify(message.target);
+                        this.findProperty('thermostatMode').setCachedValueAndNotify(message.status);
+                        this.findProperty('thermostatState').setCachedValueAndNotify(message.status === 'on' ? message.mode : 'off');
+                        this.findProperty('targetTemperature').setCachedValueAndNotify(message.target);
                         break;
                     case "motor": {
                         const index = parseInt(details[1], 10) + 1;
-                        this.findProperty(`shade${index}`)?.setCachedValueAndNotify(message.position);
-                        this.findProperty(`shade${index}Lamella`)?.setCachedValueAndNotify(message.lamella);
+                        this.findProperty(`shade${index}`).setCachedValueAndNotify(message.position);
+                        this.findProperty(`shade${index}Lamella`).setCachedValueAndNotify(message.lamella);
                         break;
                     }
                     case "led":
-                        this.findProperty('led')?.setCachedValueAndNotify(message.on === 1);
-                        this.findProperty('ledColor')?.setCachedValueAndNotify(`#${message.r.toString(16).padStart(2, '0')}${message.g.toString(16).padStart(2, '0')}${message.b.toString(16).padStart(2, '0')}`);
+                        this.findProperty('led').setCachedValueAndNotify(message.on === 1);
+                        this.findProperty('ledColor').setCachedValueAndNotify(`#${message.r.toString(16).padStart(2, '0')}${message.g.toString(16).padStart(2, '0')}${message.b.toString(16).padStart(2, '0')}`);
                         break;
                     case "input":
                         console.warn("unhandled state info for input", details[1], message);
@@ -600,7 +600,7 @@ class Dingz extends Device {
                     }
                     case "pir":
                         if(details[1] === "0") {
-                            this.findProperty("motion")?.setCachedValueAndNotify(message);
+                            this.findProperty("motion").setCachedValueAndNotify(message);
                         }
                         break;
                 }
