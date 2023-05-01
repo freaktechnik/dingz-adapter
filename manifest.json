@@ -3,7 +3,7 @@
     "id": "dingz-adapter",
     "name": "Dingz",
     "short_name": "Dingz",
-    "version": "0.4.0",
+    "version": "0.5.0",
     "description": "Adapter for Dingz pucks",
     "homepage_url": "https://github.com/freaktechnik/dingz-adapter",
     "license": "MIT",
@@ -20,15 +20,20 @@
         "schema": {
             "type": "object",
             "required": [
-                "poll_interval"
+                "host",
+                "port"
             ],
             "properties": {
-                "poll_interval": {
+                "host": {
+                    "type": "string",
+                    "title": "MQTT Host",
+                    "default": "localhost"
+                },
+                "port": {
                     "type": "integer",
+                    "title": "Port",
                     "minimum": 1,
-                    "title": "Polling interval (s)",
-                    "step": 1,
-                    "default": 3
+                    "default": 1883
                 }
             }
         }

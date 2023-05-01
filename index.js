@@ -2,10 +2,10 @@
 
 const { Adapter, Device, Property, Event, Database } = require('gateway-addon');
 const manifest = require('./manifest.json');
-const { Client } = require('node-ssdp');
 const fetch = require('node-fetch');
 const { URLSearchParams } = require('url');
-const WebEventEndpoint = require('./events');
+const dnssd = require('dnssd');
+const { connect } = require('mqtt');
 
 const DEFAULT_POLL_INTERVAL_S = 3;
 const THERMOSTAT_STATE_TO_MODE = {
@@ -51,64 +51,100 @@ function hsv2rgb(hsv) {
 class DingzDiscovery {
     constructor(discoveryCallback) {
         this.discoveryCallback = discoveryCallback;
-        this.server = new Client()
-        this.server.on('response', (headers, statusCode, remoteInfo) => {
-            if(this.discoveryCallback) {
-                fetch(`http://${remoteInfo.address}/api/v1/info`)
-                    .then((response) => response.json())
-                    .then((info) => {
-                        this.discoveryCallback({
-                            mac: info.mac,
-                            address: remoteInfo.address,
-                        });
-                    });
+        this.server = new dnssd.Browser(new dnssd.ServiceType('_http._tcp'));
+        this.server.on('serviceUp', (service) => {
+            if(this.discoveryCallback && service.name.startsWith('DINGZ')) {
+                this.discoveryCallback({
+                    mac: service.txt.mac,
+                    address: service.addresses[0],
+                });
             }
         });
-        this.server.search('urn:schemas-iolo-ch:device:DINGZ:1.0');
+        this.server.start();
     }
     destroy() {
         this.server.stop();
     }
 }
 
-const DevicePoller = {
-    timer: null,
-    devices: new Set(),
-    async getPollInterval() {
-        const db = new Database(manifest.name);
-        await db.open();
-        const { poll_interval = DEFAULT_POLL_INTERVAL_S } = await db.loadConfig();
-        return poll_interval * 1000;
-    },
-    addDevice(device) {
-        this.devices.add(device);
-        if(!this.timer) {
-            this.getPollInterval()
-                .then((interval) => {
-                    this.timer = setInterval(() => this.notifyDevices(), interval);
-                })
-                .catch(console.error);
-        }
-    },
-    destroy() {
-        if(this.timer) {
-            clearInterval(this.timer);
-            this.timer = null;
-        }
-        this.devices = new Set();
-    },
-    removeDevice(device) {
-        this.devices.delete(device);
-        if(this.devices.size === 0) {
-            this.destroy();
-        }
-    },
-    notifyDevices() {
-        for(const device of this.devices) {
-            device.poll();
-        }
+class DingzMQTT {
+    constructor(adapter) {
+        this.adapter = adapter;
+        this.connect();
     }
-};
+
+    async connect() {
+        const db = new Database("dingz-adapter");
+        await db.open();
+        const { host = 'localhost', port = 1883 } = await db.loadConfig();
+        this.address = `mqtt://${host}:${port}`;
+        this.client = connect(this.address);
+
+        this.client.on('connect', () => {
+            this.client.subscribe('dingz/#');
+        });
+
+        this.client.on('error', (error) => {
+            console.error(error);
+        });
+
+        this.client.on('message', (topic, message) => {
+            const [dingzTopic, dingzId, ...localPath] = topic.split('/');
+            if (dingzTopic !== "dingz") {
+                return;
+            }
+            const device = this.adapter.getDevice(`dingz-${dingzId}`);
+            let parsedMessage;
+            let messageString = message.toString('ascii');
+            try {
+                // Workaround invalid JSON
+                if(topic.endsWith("state/thermostat")) {
+                    messageString = messageString.replace('"target:"', '"target":');
+                }
+                parsedMessage = JSON.parse(messageString);
+            }
+            catch(error) {
+                if(['s', 'ss', 'n'].includes(messageString)) {
+                    parsedMessage = messageString !== 'n';
+                }
+                else if(['p', 'h', 'r'].includes(messageString) || messageString.startsWith('m')) {
+                    parsedMessage = messageString;
+                }
+                else {
+                    console.error(error, "while parsing", topic, messageString);
+                    return;
+                }
+            }
+            if (!device) {
+                if (localPath[0] === 'announce') {
+                    this.adapter.handleDiscovery({
+                        mac: dingzId.toUpperCase(),
+                        address: parsedMessage.ip
+                    });
+                }
+                return;
+            }
+            device.mqttEvent(localPath.join('/'), parsedMessage);
+        });
+    }
+
+    sendEvent(dingzId, localPath, message) {
+        return new Promise((resolve, reject) => {
+            this.client.publish(`dingz/${dingzId}/${localPath}`, message, (error) => {
+                if(error) {
+                    reject(error);
+                }
+                else {
+                    resolve();
+                }
+            });
+        });
+    }
+
+    destroy() {
+        this.client.end();
+    }
+}
 
 class BasicDingzProperty extends Property {
     constructor(device, name, spec, ...args) {
@@ -126,20 +162,17 @@ class BasicDingzProperty extends Property {
 class DingzProperty extends BasicDingzProperty {
     async setValue(value) {
         if(this.name === 'led') {
-            const action = value ? 'on' : 'off';
-            const params = new URLSearchParams();
-            params.append('action', action);
-            await this.device.apiCall('led/set', 'POST', params);
+            const action = value ? 1 : 0;
+            await this.device.sendMqttEvent("command/led", { on: action });
         }
         else if(this.name === 'ledColor') {
             if (!value) {
                 return;
             }
-            const params = new URLSearchParams();
-            params.append('color', value.slice(1).toUpperCase());
-            params.append('mode', 'rgb');
-            params.append('action', this.device.findProperty('led') ? 'on' : 'off');
-            await this.device.apiCall('led/set', 'POST', params);
+            const r = parseInt(value.slice(1, 3), 16);
+            const g = parseInt(value.slice(3, 5), 16);
+            const b = parseInt(value.slice(5), 16);
+            await this.device.sendMqttEvent("command/led", { r, g, b });
         }
         else if(this.name === 'targetTemperature') {
             const mode = await this.device.getProperty('thermostatMode');
@@ -173,7 +206,7 @@ class DingzProperty extends BasicDingzProperty {
                 }
             }
             const indexNumber = parseInt(index);
-            await this.device.apiCall(`shade/${indexNumber - 1}`, 'POST', `blind=${blindValue}&lamella=${lamellaValue}`);
+            await this.device.sendMqttEvent(`command/motor/${indexNumber - 1}`, {position: blindValue, lamella: lamellaValue });
         }
         else if(this.name.startsWith('dimmer')) {
             //TODO
@@ -194,6 +227,7 @@ class Dingz extends Device {
             'PushButton',
             'TemperatureSensor'
         ];
+        this.configureMqtt();
         Promise.all([
             this.apiCall('system_config')
                 .then((systemConfig) => {
@@ -354,7 +388,6 @@ class Dingz extends Device {
                 if(this.dimmerGroup1 || this.dimmerGroup2) {
                     detailPromises[1] = this.apiCall('dimmer_config');
                 }
-                detailPromises.push(this.registerEventListener());
                 //TODO LED actions (toggle, blink)
                 return Promise.all(detailPromises);
             })
@@ -415,11 +448,177 @@ class Dingz extends Device {
         if(action.name.startsWith('shade')) {
             const index = parseInt(action.name.slice(5, 6)) - 1;
             const actionName = action.name.slice(6);
-            return this.apiCall(`shade/${index}/${actionName}`, 'POST');
+            let actionMotion = NaN;
+            if(actionName === "stop") {
+                actionMotion = 0;
+            }
+            else if(actionName === "up") {
+                actionMotion = 1;
+            }
+            else if(actionName === "down") {
+                actionMotion = 2;
+            }
+            else {
+                console.error("Unknown shade action", action.name);
+                return;
+            }
+            return this.sendMqttEvent(`command/motor/${index}`, { motion: actionMotion });
         }
         if(action.name.startsWith('dimmer')) {
-            //TODO toggle action
+            return this.sendMqttEvent(`command/light/${parseInt(action.name.slice(6,7)) - 1}`, {turn: "toggle"});
         }
+    }
+
+    configureMqtt() {
+        return this.apiCall('services_config', 'POST', JSON.stringify({
+            mqtt: {
+                uri: this.adapter.mqtt.address,
+                enable: true,
+                "server.crt": null
+            }
+        }));
+    }
+
+    mqttEvent(path, message) {
+        const [deviceType, event, ...details] = path.split('/');
+        if(deviceType === "online") {
+            this.connectedNotify(message);
+            return;
+        }
+        if(deviceType === "announce") {
+            this.address = message.ip;
+            this.deviceType = message.model;
+            return;
+        }
+        if(deviceType === "last_alive") {
+            return;
+        }
+        this.deviceType = deviceType;
+        switch(event) {
+            case "sensor":
+                switch(details[0]) {
+                    case "temperature":
+                        this.findProperty("temperature")?.setCachedValueAndNotify(message);
+                        break;
+                    case "light":
+                        this.findProperty("lightLevel")?.setCachedValueAndNotify(message);
+                        break;
+                }
+                break;
+            case "power":
+                const index = parseInt(details[1], 10) + 1;
+                switch(details[0]) {
+                    case "motor":
+                        this.findProperty(`shade${index}Power`)?.setCachedValueAndNotify(message);
+                        break;
+                    case "light":
+                        this.findProperty(`dimmer${index}Power`)?.setCachedValueAndNotify(message);
+                        break;
+                }
+                break;
+            case "energy":
+                switch(details[0]) {
+                    case "motor":
+                    case "light":
+                        //TODO no properties for these, not even sure what unit this is?
+                        break;
+                }
+                break;
+            case "state":
+                switch(details[0]) {
+                    case "light": {
+                        const index = parseInt(details[1], 10) + 1;
+                        this.findProperty(`dimmer${index}`)?.setCachedValueAndNotify(message.turn === "off");
+                        this.findProperty(`dimmer${index}Brightness`)?.setCachedValueAndNotify(message.brightness);
+                        break;
+                    }
+                    case "thermostat":
+                        this.findProperty('thermostatMode')?.setCachedValueAndNotify(message.status);
+                        this.findProperty('thermostatState')?.setCachedValueAndNotify(message.status === 'on' ? message.mode : 'off');
+                        this.findProperty('targetTemperature')?.setCachedValueAndNotify(message.target);
+                        break;
+                    case "motor": {
+                        const index = parseInt(details[1], 10) + 1;
+                        this.findProperty(`shade${index}`)?.setCachedValueAndNotify(message.position);
+                        this.findProperty(`shade${index}Lamella`)?.setCachedValueAndNotify(message.lamella);
+                        break;
+                    }
+                    case "led":
+                        this.findProperty('led')?.setCachedValueAndNotify(message.on === 1);
+                        this.findProperty('ledColor')?.setCachedValueAndNotify(`#${message.r.toString(16).padStart(2, '0')}${message.g.toString(16).padStart(2, '0')}${message.b.toString(16).padStart(2, '0')}`);
+                        break;
+                    case "input":
+                        console.warn("unhandled state info for input", details[1], message);
+                        break;
+                }
+
+                break;
+            case "event":
+                switch(details[0]) {
+                    case "button": {
+                        const keyID = `key${parseInt(details[1], 10) + 1}`;
+                        if (keyID === "key5") {
+                            console.warn("Input as button not yet supported");
+                            return;
+                        }
+                        switch(message) {
+                            case "p":
+                                this.findProperty(keyID).setCachedValueAndNotify(true);
+                                break;
+                            case "m1":
+                                this.eventNotify(new Event(this, `${keyID}single`));
+                                this.findProperty(keyID).setCachedValueAndNotify(false);
+                                break;
+                            case "m2":
+                                this.eventNotify(new Event(this, `${keyID}double`));
+                                this.findProperty(keyID).setCachedValueAndNotify(false);
+                                break;
+                            case "m3":
+                                this.eventNotify(new Event(this, `${keyID}tripple`));
+                                this.findProperty(keyID).setCachedValueAndNotify(false);
+                                break;
+                            case "m2":
+                                this.eventNotify(new Event(this, `${keyID}quadruple`));
+                                this.findProperty(keyID).setCachedValueAndNotify(false);
+                                break;
+                            case "h":
+                                break;
+                            case "r":
+                                this.eventNotify(new Event(this, `${keyID}long`));
+                                this.findProperty(keyID).setCachedValueAndNotify(false);
+                                break;
+                            default:
+                                if (message.startsWith("m")) {
+                                    this.findProperty(keyID).setCachedValueAndNotify(false);
+                                }
+                                else {
+                                    console.warn("unhandled button event", message, keyID);
+                                }
+                                break;
+                        }
+                        break;
+                    }
+                    case "pir":
+                        if(details[1] === "0") {
+                            this.findProperty("motion")?.setCachedValueAndNotify(message);
+                        }
+                        break;
+                }
+                break;
+            case "command":
+                // Ignore commands, those are for the dingz to consume.
+                break;
+            default:
+                console.warn("Unhandled event", path, message);
+        }
+    }
+
+    async sendMqttEvent(path, message) {
+        if(!this.deviceType) {
+            console.error("Device type not configured, can't publish MQTT messages for device.");
+            return;
+        }
+        return this.adapter.mqtt.sendEvent(this.mac.toLowerCase(), `${this.deviceType}/${path}`, JSON.stringify(message));
     }
 
     async apiCall(path, method = 'GET', body) {
@@ -598,59 +797,6 @@ class Dingz extends Device {
         });
     }
 
-    async registerEventListener() {
-        const callbackUrl = await WebEventEndpoint.addDevice(this);
-        console.log(callbackUrl, this.mac);
-        await this.apiCall('action/generic', 'POST', callbackUrl);
-        await this.apiCall('action/btn1/begin', 'POST', `${callbackUrl}?index=1&action=begin&mac=${this.mac}`);
-        await this.apiCall('action/btn1/end', 'POST', callbackUrl + `?index=1&action=end&mac=${this.mac}`);
-        await this.apiCall('action/btn2/begin', 'POST', callbackUrl + `?index=2&action=begin&mac=${this.mac}`);
-        await this.apiCall('action/btn2/end', 'POST', callbackUrl + `?index=2&action=end&mac=${this.mac}`);
-        await this.apiCall('action/btn3/begin', 'POST', callbackUrl + `?index=3&action=begin&mac=${this.mac}`);
-        await this.apiCall('action/btn3/end', 'POST', callbackUrl + `?index=3&action=end&mac=${this.mac}`);
-        await this.apiCall('action/btn4/begin', 'POST', callbackUrl + `?index=4&action=begin&mac=${this.mac}`);
-        await this.apiCall('action/btn4/end', 'POST', callbackUrl + `?index=4&action=end&mac=${this.mac}`);
-    }
-
-    handleGenericEvent(index, action) {
-        const indexNumber = parseInt(index);
-        if(indexNumber <= 4) {
-            const keyID = `key${index}`;
-            if(action === '1') {
-                this.eventNotify(new Event(this, keyID + 'single'));
-            }
-            else if(action === '2') {
-                this.eventNotify(new Event(this, keyID + 'double'))
-            }
-            else if(action === '3') {
-                this.eventNotify(new Event(this, keyID + 'long'))
-            }
-            else if(action === '20') {
-                this.eventNotify(new Event(this, keyID + 'tripple'));
-            }
-            else if(action === '21') {
-                this.eventNotify(new Event(this, keyID + 'quadruple'));
-            }
-            else if(action === '8' || action === 'begin') {
-                this.findProperty(keyID).setCachedValueAndNotify(true);
-            }
-            else if(action === '9' || action === 'end') {
-                this.findProperty(keyID).setCachedValueAndNotify(false);
-            }
-        }
-        else if(indexNumber === 5) {
-            if(action === '8') {
-                this.findProperty('motion').setCachedValueAndNotify(true);
-            }
-            else if(action === '9') {
-                this.findProperty('motion').setCachedValueAndNotify(false);
-            }
-        }
-        else {
-            //TODO input
-        }
-    }
-
     updateFromDiscovery(address) {
         this.connectedNotify(true);
         if(address && !address.includes(':')) {
@@ -668,6 +814,9 @@ class Dingz extends Device {
             return;
         }
         const state = await this.apiCall('state');
+        if (!state) {
+            return;
+        }
         if(state.sensors.brightness !== null) {
             this.findProperty('lightLevel').setCachedValueAndNotify(state.sensors.brightness);
         }
@@ -717,8 +866,7 @@ class DingzAdapter extends Adapter {
     constructor(addonManager) {
         super(addonManager, manifest.id, manifest.id);
         addonManager.addAdapter(this);
-
-        this.startDiscovery();
+        this.mqtt = new DingzMQTT(this);
     }
 
     handleDiscovery(deviceSpec) {
@@ -736,13 +884,10 @@ class DingzAdapter extends Adapter {
     }
 
     handleDeviceAdded(device) {
-        DevicePoller.addDevice(device);
         super.handleDeviceAdded(device);
     }
 
     handleDeviceRemoved(device) {
-        WebEventEndpoint.removeDevice(device);
-        DevicePoller.removeDevice(device);
         super.handleDeviceRemoved(device);
     }
 
@@ -751,8 +896,7 @@ class DingzAdapter extends Adapter {
             this.discovery.destroy();
             delete this.discovery;
         }
-        DevicePoller.destroy();
-        WebEventEndpoint.destroy();
+        this.mqtt.destroy();
 
         return Promise.resolve();
     }
