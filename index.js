@@ -7,10 +7,10 @@ const { URLSearchParams } = require('url');
 const dnssd = require('dnssd');
 const { connect } = require('mqtt');
 
-const DEFAULT_POLL_INTERVAL_S = 3;
 const THERMOSTAT_STATE_TO_MODE = {
     heating: 'heat',
-    cooling: 'cool'
+    cooling: 'cool',
+    off: 'off',
 };
 
 // based on https://www.rapidtables.com/convert/color/hsv-to-rgb.html
@@ -176,40 +176,38 @@ class DingzProperty extends BasicDingzProperty {
         }
         else if(this.name === 'targetTemperature') {
             const mode = await this.device.getProperty('thermostatMode');
-            await this.device.apiCall(`thermostat/${mode}?temp=${value}`, 'POST');
+            await this.device.sendMqttEvent("command/thermostat", {target: value});
         }
         else if(this.name === 'thermostatMode') {
             const targetTemperature = await this.device.getProperty('targetTemperature');
-            await this.device.apiCall(`thermostat/${value ? 'on' : 'off'}?temp=${targetTemperature}`, 'POST');
-            //TODO support switching between heating and cooling?
+            let mode = 'off';
+            for (const [key, modeVal] of Object.entries(THERMOSTAT_STATE_TO_MODE)) {
+                if(modeVal === value) {
+                    mode = key;
+                    break;
+                }
+            }
+            await this.device.sendMqttEvent("command/thermostat", {mode});
         }
         else if(this.name.startsWith('shade')) {
             let index = this.name.slice(5);
-            let blindValue = value;
-            let lamellaValue;
+            const indexNumber = parseInt(index, 10) - 1;
             if(this.name.endsWith('Lamella')) {
-                index = index.slice(0, -7);
-                lamellaValue = value;
-                try {
-                    blindValue = await this.device.getProperty(this.name.slice(0, -7));
-                }
-                catch(error) {
-                    blindValue = 100;
-                }
+                await this.device.sendMqttEvent(`command/motor/${indexNumber}`, {lamella: value});
             }
             else {
-                try {
-                    lamellaValue = await this.device.getProperty(this.name + 'Lamella');
-                }
-                catch(error) {
-                    lamellaValue = 100;
-                }
+                await this.device.sendMqttEvent(`command/motor/${indexNumber}`, {position: value});
             }
-            const indexNumber = parseInt(index);
-            await this.device.sendMqttEvent(`command/motor/${indexNumber - 1}`, {position: blindValue, lamella: lamellaValue });
         }
         else if(this.name.startsWith('dimmer')) {
-            //TODO
+            const index = this.name.slice(6);
+            const indexNumber = parseInt(index, 10) - 1;
+            if(this.name.endsWith('Brightness')) {
+                await this.device.sendMqttEvent(`command/light/${indexNumber}`, {brightness: value});
+            }
+            else {
+                await this.device.sendMqttEvent(`command/light/${indexNumber}`, {turn: value ? 'on' : 'off'});
+            }
         }
         return super.setValue(value);
     }
@@ -392,6 +390,7 @@ class Dingz extends Device {
                 return Promise.all(detailPromises);
             })
             .then(([ blindConfig, dimmerConfig ] = []) => {
+                //TODO keys can now also have names etc.
                 if(blindConfig) {
                     if(this.shade1) {
                         this.setShadeConfig(1, blindConfig);
@@ -533,14 +532,16 @@ class Dingz extends Device {
                         break;
                     }
                     case "thermostat":
-                        this.findProperty('thermostatMode').setCachedValueAndNotify(message.status);
-                        this.findProperty('thermostatState').setCachedValueAndNotify(message.status === 'on' ? message.mode : 'off');
+                        this.findProperty('thermostatMode').setCachedValueAndNotify(THERMOSTAT_STATE_TO_MODE[message.mode]);
+                        this.findProperty('thermostatState').setCachedValueAndNotify(message.status !== 'off' ? message.mode : 'off');
                         this.findProperty('targetTemperature').setCachedValueAndNotify(message.target);
                         break;
                     case "motor": {
                         const index = parseInt(details[1], 10) + 1;
-                        this.findProperty(`shade${index}`).setCachedValueAndNotify(message.position);
-                        this.findProperty(`shade${index}Lamella`).setCachedValueAndNotify(message.lamella);
+                        this.findProperty(`shade${index}`).setCachedValueAndNotify(message.hasOwnProperty("goal") ? message.goal : message.position);
+                        if(message.hasOwnProperty("lamella")) {
+                            this.findProperty(`shade${index}Lamella`).setCachedValueAndNotify(message.lamella);
+                        }
                         break;
                     }
                     case "led":
