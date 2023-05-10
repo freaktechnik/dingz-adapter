@@ -457,6 +457,12 @@ class Dingz extends Device {
             else if(actionName === "down") {
                 actionMotion = 2;
             }
+            else if(actionName === "position") {
+                return this.sendMqttEvent(`command/motor/${index}`, {
+                    position: action.input.position,
+                    lamella: action.input.lamella
+                });
+            }
             else {
                 console.error("Unknown shade action", action.name);
                 return;
@@ -689,6 +695,24 @@ class Dingz extends Device {
         this.addAction(`shade${index}stop`, {
             title: `Shade ${index} stop`
         });
+        this.addAction(`shade${index}position`, {
+            title: `Shade ${index} position`,
+            input: {
+                type: "object",
+                properties: {
+                    position: {
+                        type: "integer",
+                        minimum: 0,
+                        maximum: 100
+                    },
+                    lamella: {
+                        type: "integer",
+                        minimum: 0,
+                        maximum: 100
+                    }
+                }
+            }
+        })
         //TODO initialize action?
     }
 
@@ -696,6 +720,7 @@ class Dingz extends Device {
         const shadeConfig = config.blinds[index - 1];
         const lamellaProperty = this.findProperty(`shade${index}Lamella`);
         lamellaProperty.visible = shadeConfig.type === 'blind';
+        this.actions.get(`shade${index}position`).visible = lamellaProperty.visible;
         const levelProperty = this.findProperty(`shade${index}`);
         levelProperty.minimum = shadeConfig.min_value;
         levelProperty.maximum = shadeConfig.max_value;
@@ -706,6 +731,7 @@ class Dingz extends Device {
             this.actions.get(`shade${index}up`).title = `${shadeConfig.name} up`;
             this.actions.get(`shade${index}down`).title = `${shadeConfig.name} down`;
             this.actions.get(`shade${index}stop`).title = `Stop ${shadeConfig.name}`;
+            this.actions.get(`shade${index}position`).title = `Set ${shadeConfig.name} position`;
         }
     }
 
