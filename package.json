@@ -19,7 +19,7 @@
   "dependencies": {
     "dnssd": "^0.4.1",
     "mqtt": "^4.3.7",
-    "node-fetch": "^2.6.10",
+    "node-fetch": "^2.6.11",
     "uuid": "^9.0.0"
   },
   "devDependencies": {
