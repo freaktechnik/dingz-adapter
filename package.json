@@ -18,7 +18,7 @@
   "homepage": "https://github.com/freaktechnik/dingz-adapter#readme",
   "dependencies": {
     "dnssd": "^0.4.1",
-    "mqtt": "^4.3.7",
+    "mqtt": "^5.0.1",
     "node-fetch": "^2.6.12",
     "uuid": "^9.0.0"
   },
