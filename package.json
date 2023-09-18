@@ -20,7 +20,7 @@
     "dnssd": "^0.4.1",
     "mqtt": "^4.3.7",
     "node-fetch": "^2.7.0",
-    "uuid": "^9.0.0"
+    "uuid": "^9.0.1"
   },
   "devDependencies": {
     "nlf": "^2.1.1"
